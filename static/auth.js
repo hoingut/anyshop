@@ -1,6 +1,3 @@
-          displayError(error.message);
-        });
-});
 // --- Step 1: Import necessary functions from Firebase SDKs ---
 
 // Import services you need from your firebaseConfig.js file
