@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnyShop - Your One-Stop Online Store</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom CSS (optional) -->
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-50">
+        <!-- Left: Toggle Menu -->
+        <button id="menu-toggle-btn" class="text-xl lg:hidden">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a href="/" class="hidden lg:block text-2xl font-bold text-indigo-600">AnyShop</a>
+
+        <!-- Center: Navigation Links (for larger screens) -->
+        <div class="hidden lg:flex space-x-6 items-center">
+            <a href="/" class="hover:text-indigo-600">Home</a>
+            <a href="/products" class="hover:text-indigo-600">Products</a>
+            <a href="/menu" class="hover:text-indigo-600">Menu</a>
+        </div>
+        
+        <!-- Center Title (for smaller screens) -->
+         <a href="/" class="lg:hidden text-2xl font-bold text-indigo-600">AnyShop</a>
+
+        <!-- Right: Account & Cart -->
+        <div class="flex items-center space-x-4">
+            <button id="notification-btn" class="text-xl"><i class="fas fa-bell"></i></button>
+            <a href="/account" class="text-xl"><i class="fas fa-user"></i></a>
+            <a href="/checkout" class="text-xl"><i class="fas fa-shopping-cart"></i></a>
+        </div>
+    </nav>
+    
+    <!-- Mobile Menu (Hidden by default) -->
+    <div id="mobile-menu" class="hidden lg:hidden bg-white shadow-lg absolute top-16 left-0 w-full z-40">
+        <a href="/" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Home</a>
+        <a href="/products" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Products</a>
+        <a href="/menu" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Menu</a>
+    </div>
+
+    <main class="container mx-auto px-4 py-6">
+        <!-- Welcome Banner -->
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center py-16 rounded-lg shadow-xl mb-8">
+            <h1 class="text-4xl md:text-5xl font-extrabold">Welcome to AnyShop!</h1>
+            <p class="mt-4 text-lg opacity-90">Find the best products at unbeatable prices.</p>
+        </header>
+
+        <!-- Image Slider -->
+        <div class="bg-gray-200 h-64 md:h-80 rounded-lg my-8 flex items-center justify-center text-gray-500 shadow-md">
+            <!-- Slider content can be dynamic. For now, a placeholder -->
+            <p class="text-2xl font-semibold">Dynamic Image Slider with Links</p>
+        </div>
+
+        <!-- Hot Products Section -->
+        <section class="my-10">
+            <h2 class="text-3xl font-bold mb-6 text-center">🔥 Hot Products</h2>
+            <div id="hot-products-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                <!-- Loading Skeleton -->
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+            </div>
+        </section>
+
+        <!-- Top 100 New Products Section -->
+        <section class="my-10">
+            <h2 class="text-3xl font-bold mb-6 text-center">✨ Top 100 New Arrivals</h2>
+            <div id="new-products-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                <!-- Loading Skeleton -->
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+                <div class="animate-pulse bg-white rounded-lg shadow-md h-72"></div>
+            </div>
+        </section>
+        
+        <!-- Notice Section -->
+        <section class="my-10 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md shadow">
+            <h3 class="font-bold">Notice</h3>
+            <p>Special discounts available this weekend! Use code <span class="font-semibold">WEEKEND15</span> for 15% off.</p>
+        </section>
+
+        <!-- Flash Sell Section (Add if needed) -->
+        <!-- CTA for All Products -->
+        <section class="text-center my-10">
+            <a href="/products" class="bg-indigo-600 text-white text-lg font-semibold py-3 px-10 rounded-full hover:bg-indigo-700 transition-transform transform hover:scale-105">
+                View All Products
+            </a>
+        </section>
+        
+        <!-- Reviews/Testimonials (Static for now) -->
+        <section class="my-10">
+            <h2 class="text-3xl font-bold mb-6 text-center">What Our Customers Say</h2>
+            <!-- Review cards go here -->
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-10">
+        <div class="container mx-auto text-center">
+            <p>&copy; {{ current_year }} AnyShop. All rights reserved.</p>
+            <div class="mt-4 space-x-4">
+                <a href="#" class="hover:text-indigo-400">About Us</a>
+                <a href="#" class="hover:text-indigo-400">Contact</a>
+                <a href="#" class="hover:text-indigo-400">Privacy Policy</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Widgets -->
+    <div id="support-widget" class="fixed bottom-5 left-5 bg-blue-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer">
+        <i class="fas fa-question text-2xl"></i>
+    </div>
+    <div id="cart-checkout-widget" class="fixed bottom-5 right-5 bg-green-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer">
+        <i class="fas fa-shopping-cart text-2xl"></i>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <!-- Your Firebase Config & Main Script -->
+    <script src="/static/firebaseConfig.js"></script>
+    <script src="/static/home.js"></script>
+</body>
+      </html>
