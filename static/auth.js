@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorContainer = document.getElementById('error-message-container');
     const errorText = document.getElementById('error-text');
 
+    
     // --- UI Helper Functions for Debugging ---
 
     const showLoading = (button) => {
