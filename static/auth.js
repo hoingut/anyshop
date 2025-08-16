@@ -20,7 +20,6 @@ import {
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-
 // --- Step 2: Add event listener to run code after the DOM is loaded ---
 
 document.addEventListener('DOMContentLoaded', () => {
