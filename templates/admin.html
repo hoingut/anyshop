@@ -169,12 +169,8 @@
             border-bottom-color: #4F46E5;
         }
     </style>
-
-    <!-- Firebase SDKs and custom script -->
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    <script src="/static/firebaseConfig.js"></script>
-    <script src="/static/admin.js"></script>
+    <!-- ... body content ... -->
+<script type="module" src="/static/firebaseConfig.js"></script>
+<script type="module" src="/static/admin.js"></script> <!-- এখানে auth.js থাকবে না -->
 </body>
 </html>
