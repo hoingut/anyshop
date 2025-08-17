@@ -12,7 +12,6 @@ import {
     orderBy,
     getDocs
 } from './firebaseConfig.js';
-
 // Import functions from the Firebase Auth SDK
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
