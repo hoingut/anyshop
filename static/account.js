@@ -14,7 +14,6 @@ import {
 } from './firebaseConfig.js';
 // Import functions from the Firebase Auth SDK
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
     const getElement = (id) => document.getElementById(id);
