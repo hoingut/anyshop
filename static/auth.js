@@ -3,16 +3,15 @@
 // Import services you need from your firebaseConfig.js file
 import { auth, db, googleProvider } from './firebaseConfig.js';
 
-// Import auth functions we will use
+// Import auth functions we will use from the SDK
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signInWithRedirect,
-    getRedirectResult,
-    onAuthStateChanged // Optional: to check login status on page load
+    getRedirectResult
 } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
-// Import firestore functions we will use
+// Import firestore functions we will use from the SDK
 import {
     doc,
     setDoc,
@@ -20,159 +19,165 @@ import {
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-// --- Step 2: Add event listener to run code after the DOM is loaded ---
+// --- Step 2: Main execution block after DOM is loaded ---
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- DOM Element References ---
-    const signupContainer = document.getElementById('signup-container');
-    const loginContainer = document.getElementById('login-container');
-    const showLoginLink = document.getElementById('show-login');
-    const showSignupLink = document.getElementById('show-signup');
+    const getElement = (id) => document.getElementById(id);
+    
+    const signupContainer = getElement('signup-container');
+    const loginContainer = getElement('login-container');
+    const showLoginLink = getElement('show-login');
+    const showSignupLink = getElement('show-signup');
+    const signupForm = getElement('signup-form');
+    const loginForm = getElement('login-form');
+    const googleLoginBtn = getElement('google-login-btn');
+    const errorContainer = getElement('error-message-container');
+    const errorText = getElement('error-text');
 
-    const signupForm = document.getElementById('signup-form');
-    const loginForm = document.getElementById('login-form');
-    const googleLoginBtn = document.getElementById('google-login-btn');
+    // **IMPROVEMENT**: Guard clause to prevent errors if this script is loaded on the wrong page.
+    if (!loginContainer || !signupContainer) {
+        console.warn("Auth script loaded on a page without login/signup forms. Halting execution.");
+        return; 
+    }
 
-    const errorContainer = document.getElementById('error-message-container');
-    const errorText = document.getElementById('error-text');
-
-    // --- UI Helper Functions for Debugging & User Experience ---
+    // --- UI Helper Functions ---
 
     const showLoading = (button) => {
+        if (!button) return;
         button.disabled = true;
-        button.querySelector('.btn-text').classList.add('hidden');
-        button.querySelector('.spinner').classList.remove('hidden');
+        const btnText = button.querySelector('.btn-text');
+        const spinner = button.querySelector('.spinner');
+        if (btnText) btnText.classList.add('hidden');
+        if (spinner) spinner.classList.remove('hidden');
     };
 
     const hideLoading = (button) => {
+        if (!button) return;
         button.disabled = false;
-        button.querySelector('.btn-text').classList.remove('hidden');
-        button.querySelector('.spinner').classList.add('hidden');
+        const btnText = button.querySelector('.btn-text');
+        const spinner = button.querySelector('.spinner');
+        if (btnText) btnText.classList.remove('hidden');
+        if (spinner) spinner.classList.add('hidden');
     };
 
     const displayError = (message) => {
-        let friendlyMessage = message;
-        if (message.includes("auth/wrong-password")) {
-            friendlyMessage = "Incorrect password. Please try again.";
-        } else if (message.includes("auth/user-not-found")) {
-            friendlyMessage = "No account found with this email. Please sign up first.";
-        } else if (message.includes("auth/email-already-in-use")) {
-            friendlyMessage = "This email is already registered. Please login instead.";
-        } else if (message.includes("auth/invalid-email")) {
-            friendlyMessage = "Please enter a valid email address.";
-        }
-
-        errorText.textContent = friendlyMessage;
+        // **IMPROVEMENT**: A more robust and scalable error mapping using error codes.
+        const errorMap = {
+            "auth/wrong-password": "Incorrect password. Please try again.",
+            "auth/user-not-found": "No account found with this email. Please sign up first.",
+            "auth/email-already-in-use": "This email is already registered. Please login instead.",
+            "auth/invalid-email": "Please enter a valid email address.",
+            "auth/too-many-requests": "Access to this account has been temporarily disabled due to many failed login attempts. Try again later."
+        };
+        const errorCode = message.match(/auth\/[\w-]+/)?.[0];
+        errorText.textContent = errorMap[errorCode] || message;
         errorContainer.classList.remove('hidden');
     };
 
     const clearError = () => {
-        errorContainer.classList.add('hidden');
-        errorText.textContent = '';
+        if (errorContainer) {
+            errorContainer.classList.add('hidden');
+            errorText.textContent = '';
+        }
     };
     
+    // Using CSS classes for transitions is often more efficient, but this JS approach is also fine.
     const switchForms = (show, hide) => {
         clearError();
-        hide.classList.add('fade-out');
+        hide.classList.add('fade-out'); // Assuming you have a CSS class for this animation
         setTimeout(() => {
-            hide.classList.add('hidden-absolute');
-            show.classList.remove('hidden-absolute');
+            hide.style.display = 'none'; // Use display:none for better accessibility
+            show.style.display = 'block';
             setTimeout(() => {
                 show.classList.remove('fade-out');
-            }, 50);
-        }, 400);
+            }, 10);
+        }, 300); // Should match your CSS transition duration
     };
-
+    
     // --- Event Listeners for Form Toggling ---
-    showLoginLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        switchForms(loginContainer, signupContainer);
-    });
-
-    showSignupLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        switchForms(signupContainer, loginContainer);
-    });
-
+    if (showLoginLink) showLoginLink.addEventListener('click', (e) => { e.preventDefault(); switchForms(loginContainer, signupContainer); });
+    if (showSignupLink) showSignupLink.addEventListener('click', (e) => { e.preventDefault(); switchForms(signupContainer, loginContainer); });
+    
     // --- Authentication Logic ---
 
-    // Signup with Email
-    signupForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        clearError();
-        const signupBtn = document.getElementById('signup-btn');
-        showLoading(signupBtn);
+    if (signupForm) {
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError();
+            // **IMPROVEMENT**: Use the form's own submit button reference
+            const signupBtn = signupForm.querySelector('button[type="submit"]'); 
+            showLoading(signupBtn);
 
-        const name = document.getElementById('signup-name').value;
-        const email = document.getElementById('signup-email').value;
-        const password = document.getElementById('signup-password').value;
+            const name = getElement('signup-name').value;
+            const email = getElement('signup-email').value;
+            const password = getElement('signup-password').value;
 
-        try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const userDocRef = doc(db, 'users', userCredential.user.uid);
+                
+                await setDoc(userDocRef, {
+                    name,
+                    email,
+                    createdAt: serverTimestamp(),
+                    walletBalance: 0,
+                    role: 'customer'
+                });
 
-            // Create a reference to the new user's document
-            const userDocRef = doc(db, 'users', user.uid);
-            
-            // Set the document with user data
-            await setDoc(userDocRef, {
-                name: name,
-                email: email,
-                createdAt: serverTimestamp(), // Use server timestamp
-                walletBalance: 0,
-                role: 'customer' // Default role for new users
-            });
+                window.location.href = '/account';
+            } catch (error) {
+                console.error("Signup Error:", error);
+                hideLoading(signupBtn);
+                displayError(error.message);
+            }
+        });
+    }
 
-            window.location.href = '/account'; // Redirect on success
-        } catch (error) {
-            hideLoading(signupBtn);
-            displayError(error.message);
-        }
-    });
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError();
+            const loginBtn = loginForm.querySelector('button[type="submit"]');
+            showLoading(loginBtn);
 
-    // Login with Email
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        clearError();
-        const loginBtn = document.getElementById('login-btn');
-        showLoading(loginBtn);
+            const email = getElement('login-email').value;
+            const password = getElement('login-password').value;
 
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                window.location.href = '/account';
+            } catch (error) {
+                console.error("Login Error:", error);
+                hideLoading(loginBtn);
+                displayError(error.message);
+            }
+        });
+    }
 
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-            window.location.href = '/account'; // Redirect on success
-        } catch (error) {
-            hideLoading(loginBtn);
-            displayError(error.message);
-        }
-    });
+    if (googleLoginBtn) {
+        googleLoginBtn.addEventListener('click', () => {
+            clearError();
+            showLoading(googleLoginBtn);
+            signInWithRedirect(auth, googleProvider);
+        });
+    }
 
-    // Google Login (No-Popup Method)
-    googleLoginBtn.addEventListener('click', () => {
-        clearError();
-        showLoading(googleLoginBtn);
-        signInWithRedirect(auth, googleProvider);
-    });
-
-    // --- Handle Redirect Result from Google ---
-    // This part of the code runs every time the page loads to check if
-    // the user is coming back from a Google sign-in redirect.
-    (async () => {
+    // --- Handle Redirect Result ---
+    // **IMPROVEMENT**: Encapsulated in a named function for clarity and called once.
+    async function handleAuthRedirect() {
         try {
             const result = await getRedirectResult(auth);
             if (result && result.user) {
-                // User has successfully signed in via redirect.
+                // Show a loading state to indicate processing before redirecting
+                showLoading(googleLoginBtn || loginForm?.querySelector('button')); 
+                
                 const user = result.user;
                 const userDocRef = doc(db, 'users', user.uid);
-                
-                // Check if the user document already exists
                 const userDoc = await getDoc(userDocRef);
 
                 if (!userDoc.exists()) {
-                    // If user is new, create their profile in Firestore
                     await setDoc(userDocRef, {
                         name: user.displayName,
                         email: user.email,
@@ -182,18 +187,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
                 
-                // Redirect to the account page
                 window.location.href = '/account';
-            } else {
-                 // No redirect result, hide loading spinner on Google button if it's visible
-                 const googleBtn = document.getElementById('google-login-btn');
-                 if(googleBtn) hideLoading(googleBtn);
             }
         } catch (error) {
-            // Handle errors from the redirect.
-            const googleBtn = document.getElementById('google-login-btn');
-            if(googleBtn) hideLoading(googleBtn);
-            displayError(error.message);
+            console.error("Redirect Error:", error);
+            // Only show an error for critical issues, not if the user just cancelled.
+            if (error.code !== 'auth/redirect-cancelled-by-user') {
+                displayError(error.message);
+            }
+        } finally {
+            // Ensure the loading spinner is hidden if no redirect occurred.
+            hideLoading(googleLoginBtn);
         }
-    })();
+    }
+
+    handleAuthRedirect();
 });
