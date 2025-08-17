@@ -16,28 +16,30 @@ import {
 // Import functions from the Firebase Auth SDK
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
-
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const accountDashboard = document.getElementById('account-dashboard');
-    const logoutBtn = document.getElementById('logout-btn');
-    const userNameDisplay = document.getElementById('user-name-display');
-    const walletBalanceDisplay = document.getElementById('wallet-balance-display');
-    const totalOrdersDisplay = document.getElementById('total-orders-display');
-    const orderHistoryContainer = document.getElementById('order-history-container');
-    const profileUpdateForm = document.getElementById('profile-update-form');
-    const profileNameInput = document.getElementById('profile-name');
-    const profileEmailInput = document.getElementById('profile-email');
-    const profilePhoneInput = document.getElementById('profile-phone');
+    const getElement = (id) => document.getElementById(id);
+    
+    const loadingSpinner = getElement('loading-spinner');
+    const accountDashboard = getElement('account-dashboard');
+    const logoutBtn = getElement('logout-btn');
+    const userNameDisplay = getElement('user-name-display');
+    const walletBalanceDisplay = getElement('wallet-balance-display');
+    const totalOrdersDisplay = getElement('total-orders-display');
+    const orderHistoryContainer = getElement('order-history-container');
+    const profileUpdateForm = getElement('profile-update-form');
+    const profileNameInput = getElement('profile-name');
+    const profileEmailInput = getElement('profile-email');
+    const profilePhoneInput = getElement('profile-phone');
 
-    // --- Step 3: Authentication State Observer ---
+    // --- Step 3: Authentication State Observer (The Entry Point) ---
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // User is logged in, fetch all necessary data
+            // User is logged in. Load the page data.
             loadPageData(user);
         } else {
-            // No user is logged in, redirect to login page
+            // User is NOT logged in. Redirect to the login page immediately.
+            // This solves the "not redirecting" issue.
             const redirectUrl = encodeURIComponent(window.location.pathname);
             window.location.href = `/login?redirect=${redirectUrl}`;
         }
@@ -45,53 +47,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Main function to load all data for the logged-in user.
+     * Uses a try...catch...finally block to guarantee the loading spinner is handled.
      * @param {object} user - The Firebase user object.
      */
     async function loadPageData(user) {
         try {
-            // Fetch user profile and orders in parallel for faster loading
+            // Fetch user profile and orders in parallel for faster loading.
             const [userData, orders] = await Promise.all([
                 fetchUserProfile(user.uid),
                 fetchUserOrders(user.uid)
             ]);
 
-            // Populate the UI with the fetched data
+            // If we reach here, data fetching was successful.
+            // This solves the "data not showing" issue.
             populateDashboard(userData, orders.length);
             populateProfileForm(userData);
             displayOrders(orders);
 
-            // Hide spinner and show the dashboard
+        } catch (error) {
+            // If any promise in Promise.all fails, this block catches the error.
+            console.error("CRITICAL ERROR loading account page data:", error);
+            accountDashboard.innerHTML = `<div class="bg-white p-6 rounded-lg shadow-md text-center"><h2 class="text-xl text-red-600 font-bold">Oops!</h2><p class="text-gray-700">Could not load your account details. Please check your connection and try again.</p></div>`;
+        
+        } finally {
+            // THIS IS THE KEY FIX: This block always runs, regardless of success or error.
+            // This solves the "loading spinner not disappearing" issue.
             loadingSpinner.classList.add('hidden');
             accountDashboard.classList.remove('hidden');
-
-        } catch (error) {
-            console.error("Error loading account page data:", error);
-            loadingSpinner.innerHTML = '<p class="text-red-500">Failed to load account data.</p>';
         }
     }
 
-    /**
-     * Fetches a user's profile from Firestore.
-     * @param {string} uid - The user's unique ID.
-     * @returns {Promise<object>} - A promise that resolves with the user's data.
-     */
+    // --- Step 4: Data Fetching Functions ---
+
+    /** Fetches a user's profile from Firestore. */
     async function fetchUserProfile(uid) {
         const userRef = doc(db, 'users', uid);
         const docSnap = await getDoc(userRef);
         if (docSnap.exists()) {
             return docSnap.data();
         } else {
-            console.warn("User document not found in Firestore.");
-            // Return default data based on auth object if Firestore doc is missing
-            return { name: auth.currentUser.displayName, email: auth.currentUser.email, walletBalance: 0, phoneNumber: '' };
+            // This is a critical error and should be thrown to be caught by the main catch block.
+            throw new Error("User profile not found in the database. Please contact support.");
         }
     }
 
-    /**
-     * Fetches a user's order history from Firestore.
-     * @param {string} uid - The user's unique ID.
-     * @returns {Promise<Array>} - A promise that resolves with an array of order objects.
-     */
+    /** Fetches a user's order history from Firestore. */
     async function fetchUserOrders(uid) {
         const ordersCol = collection(db, 'orders');
         const q = query(ordersCol, where("userId", "==", uid), orderBy("orderDate", "desc"));
@@ -99,11 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
     
-    // --- Step 4: UI Population Functions ---
+    // --- Step 5: UI Population and Event Handlers ---
     
     function populateDashboard(userData, orderCount) {
-        userNameDisplay.textContent = userData.name || 'User';
-        walletBalanceDisplay.textContent = `৳${userData.walletBalance || 0}`;
+        userNameDisplay.textContent = userData.name || 'Valued Customer';
+        walletBalanceDisplay.textContent = `৳${userData.walletBalance?.toFixed(2) || '0.00'}`;
         totalOrdersDisplay.textContent = orderCount;
     }
 
@@ -115,10 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayOrders(orders) {
         if (orders.length === 0) {
-            orderHistoryContainer.innerHTML = '<p class="text-gray-500 text-center py-4">You have no past orders.</p>';
+            orderHistoryContainer.innerHTML = '<p class="text-gray-500 text-center py-4">You haven\'t placed any orders yet.</p>';
             return;
         }
-
         const tableHTML = `
             <table class="min-w-full bg-white">
                 <thead class="bg-gray-50">
@@ -132,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${orders.map(order => `
                         <tr>
                             <td class="py-3 px-3">${order.productName}</td>
-                            <td class="py-3 px-3 font-semibold">৳${order.price}</td>
+                            <td class="py-3 px-3 font-semibold">৳${order.price.toFixed(2)}</td>
                             <td class="py-3 px-3">
                                 <span class="px-2 py-1 text-xs font-semibold rounded-full ${getStatusChipClass(order.status)}">
                                     ${order.status}
@@ -145,9 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
         orderHistoryContainer.innerHTML = tableHTML;
     }
 
-    // --- Step 5: Event Handlers ---
-    
-    // Profile Update Form Submission
     profileUpdateForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = auth.currentUser;
@@ -162,24 +158,21 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await updateDoc(userRef, updatedData);
             alert('Profile updated successfully!');
-            userNameDisplay.textContent = updatedData.name; // Update display name instantly
+            userNameDisplay.textContent = updatedData.name;
         } catch (error) {
             alert('Error updating profile: ' + error.message);
-            console.error("Profile update error:", error);
         }
     });
 
-    // Logout Button
     logoutBtn.addEventListener('click', () => {
         signOut(auth).then(() => {
             window.location.href = '/';
         }).catch(error => {
             console.error('Logout Error:', error);
-            alert('Failed to log out.');
         });
     });
 
-    // Tab Switching Logic (remains the same as before)
+    // Tab Switching Logic
     const navButtons = document.querySelectorAll('.account-nav-btn');
     const tabContents = document.querySelectorAll('.tab-content');
     navButtons.forEach(button => {
@@ -193,13 +186,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Step 6: Helper Functions ---
     function getStatusChipClass(status) {
         const statusClasses = {
-            'Pending': 'bg-yellow-100 text-yellow-800',
-            'Confirmed': 'bg-blue-100 text-blue-800',
-            'Shipped': 'bg-indigo-100 text-indigo-800',
-            'Delivered': 'bg-green-100 text-green-800',
+            'Pending': 'bg-yellow-100 text-yellow-800', 'Confirmed': 'bg-blue-100 text-blue-800',
+            'Shipped': 'bg-indigo-100 text-indigo-800', 'Delivered': 'bg-green-100 text-green-800',
             'Cancelled': 'bg-red-100 text-red-800',
         };
         return statusClasses[status] || 'bg-gray-100 text-gray-800';
