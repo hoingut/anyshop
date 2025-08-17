@@ -1,96 +1,136 @@
+// --- Step 1: Import necessary functions and services ---
+// Import from your custom firebaseConfig.js file
+import { 
+    auth, 
+    db, 
+    doc, 
+    getDoc, 
+    updateDoc,
+    collection,
+    query,
+    where,
+    orderBy,
+    getDocs
+} from './firebaseConfig.js';
+
+// Import functions from the Firebase Auth SDK
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Element References ---
+    // --- Step 2: DOM Element References ---
     const loadingSpinner = document.getElementById('loading-spinner');
     const accountDashboard = document.getElementById('account-dashboard');
     const logoutBtn = document.getElementById('logout-btn');
-    // --- Authentication State Observer ---
-    auth.onAuthStateChanged(user => {
+    const userNameDisplay = document.getElementById('user-name-display');
+    const walletBalanceDisplay = document.getElementById('wallet-balance-display');
+    const totalOrdersDisplay = document.getElementById('total-orders-display');
+    const orderHistoryContainer = document.getElementById('order-history-container');
+    const profileUpdateForm = document.getElementById('profile-update-form');
+    const profileNameInput = document.getElementById('profile-name');
+    const profileEmailInput = document.getElementById('profile-email');
+    const profilePhoneInput = document.getElementById('profile-phone');
+
+    // --- Step 3: Authentication State Observer ---
+    onAuthStateChanged(auth, (user) => {
         if (user) {
-            // User IS logged in. Let's fetch their data.
-            console.log('User is logged in. UID:', user.uid);
-            loadUserData(user);
+            // User is logged in, fetch all necessary data
+            loadPageData(user);
         } else {
-            // User is NOT logged in. Redirect to the login page.
-            console.log('No user logged in. Redirecting to /login...');
-            // We pass the current page as a redirect parameter.
-            window.location.href = `/login?redirect=${window.location.pathname}`;
+            // No user is logged in, redirect to login page
+            const redirectUrl = encodeURIComponent(window.location.pathname);
+            window.location.href = `/login?redirect=${redirectUrl}`;
         }
     });
 
     /**
-     * Fetches user data from Firestore and populates the dashboard.
-     * @param {firebase.User} user - The authenticated user object.
+     * Main function to load all data for the logged-in user.
+     * @param {object} user - The Firebase user object.
      */
-    function loadUserData(user) {
-        const userRef = db.collection('users').doc(user.uid);
-        
-        userRef.get().then(doc => {
-            if (doc.exists) {
-                const userData = doc.data();
-                console.log('User data found:', userData);
-                populateDashboard(userData);
-                populateProfileForm(userData);
-            } else {
-                // This case is rare but possible if a user exists in Auth but not Firestore.
-                console.warn('User document not found in Firestore. Using auth data.');
-                populateDashboard({ name: user.displayName || user.email, email: user.email, walletBalance: 0 });
-                populateProfileForm({ name: user.displayName, email: user.email, phoneNumber: '' });
-            }
-            
-            // After populating user data, fetch their orders.
-            return fetchUserOrders(user.uid);
+    async function loadPageData(user) {
+        try {
+            // Fetch user profile and orders in parallel for faster loading
+            const [userData, orders] = await Promise.all([
+                fetchUserProfile(user.uid),
+                fetchUserOrders(user.uid)
+            ]);
 
-        }).catch(error => {
-            console.error("Error fetching user document:", error);
-            // Even if there's an error, show the dashboard with partial data and an error message.
-            showDashboard();
-            document.getElementById('dashboard').innerHTML = '<p class="text-red-500">Could not load user profile.</p>';
-        });
+            // Populate the UI with the fetched data
+            populateDashboard(userData, orders.length);
+            populateProfileForm(userData);
+            displayOrders(orders);
+
+            // Hide spinner and show the dashboard
+            loadingSpinner.classList.add('hidden');
+            accountDashboard.classList.remove('hidden');
+
+        } catch (error) {
+            console.error("Error loading account page data:", error);
+            loadingSpinner.innerHTML = '<p class="text-red-500">Failed to load account data.</p>';
+        }
+    }
+
+    /**
+     * Fetches a user's profile from Firestore.
+     * @param {string} uid - The user's unique ID.
+     * @returns {Promise<object>} - A promise that resolves with the user's data.
+     */
+    async function fetchUserProfile(uid) {
+        const userRef = doc(db, 'users', uid);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            return docSnap.data();
+        } else {
+            console.warn("User document not found in Firestore.");
+            // Return default data based on auth object if Firestore doc is missing
+            return { name: auth.currentUser.displayName, email: auth.currentUser.email, walletBalance: 0, phoneNumber: '' };
+        }
+    }
+
+    /**
+     * Fetches a user's order history from Firestore.
+     * @param {string} uid - The user's unique ID.
+     * @returns {Promise<Array>} - A promise that resolves with an array of order objects.
+     */
+    async function fetchUserOrders(uid) {
+        const ordersCol = collection(db, 'orders');
+        const q = query(ordersCol, where("userId", "==", uid), orderBy("orderDate", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
     
-    /**
-     * Updates the UI with user's profile information.
-     * @param {object} userData - The user's data object from Firestore.
-     */
-    function populateDashboard(userData) {
-        document.getElementById('user-name-display').textContent = userData.name;
-        document.getElementById('wallet-balance-display').textContent = `৳${userData.walletBalance || 0}`;
-        showDashboard(); // <- This is the key to stopping the loading spinner.
-    }
+    // --- Step 4: UI Population Functions ---
     
-    /**
-     * Fetches and displays the user's order history.
-     * @param {string} userId - The UID of the current user.
-     */
-    function fetchUserOrders(userId) {
-        const orderHistoryContainer = document.getElementById('order-history-container');
-        
-        db.collection('orders').where('userId', '==', userId).orderBy('orderDate', 'desc').get()
-            .then(snapshot => {
-                document.getElementById('total-orders-display').textContent = snapshot.size; // Update total order count
-                
-                if (snapshot.empty) {
-                    orderHistoryContainer.innerHTML = '<p class="text-gray-500">You have no past orders.</p>';
-                    return;
-                }
-                
-                let tableHTML = `
-                    <table class="min-w-full bg-white">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                                <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                                <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                                <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                `;
-                snapshot.forEach(doc => {
-                    const order = doc.data();
-                    tableHTML += `
+    function populateDashboard(userData, orderCount) {
+        userNameDisplay.textContent = userData.name || 'User';
+        walletBalanceDisplay.textContent = `৳${userData.walletBalance || 0}`;
+        totalOrdersDisplay.textContent = orderCount;
+    }
+
+    function populateProfileForm(userData) {
+        profileNameInput.value = userData.name || '';
+        profileEmailInput.value = userData.email || '';
+        profilePhoneInput.value = userData.phoneNumber || '';
+    }
+
+    function displayOrders(orders) {
+        if (orders.length === 0) {
+            orderHistoryContainer.innerHTML = '<p class="text-gray-500 text-center py-4">You have no past orders.</p>';
+            return;
+        }
+
+        const tableHTML = `
+            <table class="min-w-full bg-white">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    ${orders.map(order => `
                         <tr>
-                            <td class="py-3 px-3 text-sm font-mono text-gray-500">${doc.id.substring(0, 8)}...</td>
                             <td class="py-3 px-3">${order.productName}</td>
                             <td class="py-3 px-3 font-semibold">৳${order.price}</td>
                             <td class="py-3 px-3">
@@ -99,102 +139,69 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </span>
                             </td>
                         </tr>
-                    `;
-                });
-                tableHTML += '</tbody></table>';
-                orderHistoryContainer.innerHTML = tableHTML;
-            })
-            .catch(error => {
-                console.error("Error fetching orders:", error);
-                orderHistoryContainer.innerHTML = '<p class="text-red-500">Could not load order history.</p>';
-            });
+                    `).join('')}
+                </tbody>
+            </table>`;
+        orderHistoryContainer.innerHTML = tableHTML;
     }
 
-    /**
-     * Hides the spinner and shows the main dashboard content.
-     */
-    function showDashboard() {
-        loadingSpinner.classList.add('hidden');
-        accountDashboard.classList.remove('hidden');
-    }
-
-    // --- Tab Switching Logic ---
-    const navButtons = document.querySelectorAll('.account-nav-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    navButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const targetId = button.dataset.target;
-            
-            // Update button styles
-            navButtons.forEach(btn => btn.classList.remove('active-nav-btn'));
-            button.classList.add('active-nav-btn');
-
-            // Show/hide tab content
-            tabContents.forEach(content => {
-                if (content.id === targetId) {
-                    content.classList.remove('hidden');
-                } else {
-                    content.classList.add('hidden');
-                }
-            });
-        });
-    });
-
-    // --- Profile Update Logic ---
-    const profileUpdateForm = document.getElementById('profile-update-form');
+    // --- Step 5: Event Handlers ---
     
-    function populateProfileForm(userData) {
-        document.getElementById('profile-name').value = userData.name || '';
-        document.getElementById('profile-email').value = userData.email || '';
-        document.getElementById('profile-phone').value = userData.phoneNumber || '';
-    }
-
-    profileUpdateForm.addEventListener('submit', (e) => {
+    // Profile Update Form Submission
+    profileUpdateForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const user = auth.currentUser;
         if (!user) return;
-        
+
         const updatedData = {
-            name: document.getElementById('profile-name').value,
-            phoneNumber: document.getElementById('profile-phone').value,
+            name: profileNameInput.value,
+            phoneNumber: profilePhoneInput.value,
         };
 
-        db.collection('users').doc(user.uid).update(updatedData)
-            .then(() => {
-                alert('Profile updated successfully!');
-                // Also update the display name on the dashboard
-                document.getElementById('user-name-display').textContent = updatedData.name;
-            })
-            .catch(error => {
-                alert('Error updating profile: ' + error.message);
-                console.error("Profile update error:", error);
-            });
+        const userRef = doc(db, 'users', user.uid);
+        try {
+            await updateDoc(userRef, updatedData);
+            alert('Profile updated successfully!');
+            userNameDisplay.textContent = updatedData.name; // Update display name instantly
+        } catch (error) {
+            alert('Error updating profile: ' + error.message);
+            console.error("Profile update error:", error);
+        }
     });
 
-    // --- Logout Logic ---
+    // Logout Button
     logoutBtn.addEventListener('click', () => {
-        auth.signOut().then(() => {
-            console.log('User logged out successfully.');
-            window.location.href = '/'; // Redirect to homepage after logout
+        signOut(auth).then(() => {
+            window.location.href = '/';
         }).catch(error => {
             console.error('Logout Error:', error);
+            alert('Failed to log out.');
         });
     });
-    
-    /**
-     * Helper function to get Tailwind CSS classes for order status chips.
-     * @param {string} status - The order status string.
-     * @returns {string} - The corresponding CSS classes.
-     */
+
+    // Tab Switching Logic (remains the same as before)
+    const navButtons = document.querySelectorAll('.account-nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    navButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetId = button.dataset.target;
+            navButtons.forEach(btn => btn.classList.remove('active-nav-btn'));
+            button.classList.add('active-nav-btn');
+            tabContents.forEach(content => {
+                content.id === targetId ? content.classList.remove('hidden') : content.classList.add('hidden');
+            });
+        });
+    });
+
+    // --- Step 6: Helper Functions ---
     function getStatusChipClass(status) {
-        switch (status) {
-            case 'Pending': return 'bg-yellow-100 text-yellow-800';
-            case 'Confirmed': return 'bg-blue-100 text-blue-800';
-            case 'Shipped': return 'bg-indigo-100 text-indigo-800';
-            case 'Delivered': return 'bg-green-100 text-green-800';
-            case 'Cancelled': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
+        const statusClasses = {
+            'Pending': 'bg-yellow-100 text-yellow-800',
+            'Confirmed': 'bg-blue-100 text-blue-800',
+            'Shipped': 'bg-indigo-100 text-indigo-800',
+            'Delivered': 'bg-green-100 text-green-800',
+            'Cancelled': 'bg-red-100 text-red-800',
+        };
+        return statusClasses[status] || 'bg-gray-100 text-gray-800';
     }
 });
