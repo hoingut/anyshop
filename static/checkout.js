@@ -5,7 +5,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/fir
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
     const getElement = (id) => document.getElementById(id);
-
+    
     const loadingContainer = getElement('loading-container');
     const checkoutContainer = getElement('checkout-container');
     const placeOrderForm = getElement('place-order-form');
