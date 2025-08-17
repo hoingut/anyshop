@@ -151,12 +151,10 @@
             color: white;
         }
     </style>
+<!-- v9 SDKs - এগুলোকে আর আলাদা করে লোড করতে হবে না, কারণ import স্টেটমেন্ট এগুলোকে নিয়ে আসবে -->
 
-    <!-- Firebase SDKs and custom script -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <script src="/static/firebaseConfig.js"></script>
-    <script src="/static/account.js"></script>
+<!-- Load your config and page-specific logic as MODULES -->
+<script type="module" src="/static/firebaseConfig.js"></script>
+<script type="module" src="/static/auth.js"></script> <!-- উদাহরণস্বরূপ, login.html এর জন্য -->
 </body>
       </html>
