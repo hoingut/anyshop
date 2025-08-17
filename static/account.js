@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingSpinner = document.getElementById('loading-spinner');
     const accountDashboard = document.getElementById('account-dashboard');
     const logoutBtn = document.getElementById('logout-btn');
-
     // --- Authentication State Observer ---
     auth.onAuthStateChanged(user => {
         if (user) {
