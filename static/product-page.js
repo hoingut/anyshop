@@ -11,7 +11,6 @@ import {
     getDoc 
 } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
     const loadingSkeleton = document.getElementById('loading-skeleton');
