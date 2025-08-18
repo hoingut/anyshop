@@ -93,7 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
             category: getElement('category').value, metaTitle: getElement('metaTitle').value,
             keywords: getElement('keywords').value.split(',').map(k => k.trim()),
             metaDescription: getElement('metaDescription').value,
-        };
+            // static/admin.js (productData অবজেক্টে যোগ করুন)
+    // ... আগের সব ফিল্ড
+    advanceDeliveryRequired: document.getElementById('advanceDeliveryRequired').checked, // <-- নতুন লাইন
+};
+    
 
         try {
             if (editingProductId) {
