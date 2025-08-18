@@ -1,7 +1,6 @@
 // --- Step 1: Import necessary functions and services from Firebase ---
 import { auth, db, doc, getDoc, addDoc, collection, serverTimestamp } from './firebaseConfig.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
     const getElement = (id) => document.getElementById(id);
