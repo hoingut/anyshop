@@ -1,209 +1,200 @@
 // --- Step 1: Import necessary functions and services ---
-// Import from your custom firebaseConfig.js file
-import { 
-    auth, 
-    db, 
-    doc, 
-    getDoc, 
-    updateDoc,
-    collection,
-    query,
-    where,
-    orderBy,
-    getDocs
-} from './firebaseConfig.js';
-// Import functions from the Firebase Auth SDK
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+import { auth, db, doc, getDoc, addDoc, collection, serverTimestamp } from './firebaseConfig.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
     const getElement = (id) => document.getElementById(id);
-    const loadingSpinner = getElement('loading-spinner');
-    const accountDashboard = getElement('account-dashboard');
-    const logoutBtn = getElement('logout-btn');
-    const userNameDisplay = getElement('user-name-display');
-    const walletBalanceDisplay = getElement('wallet-balance-display');
-    const totalOrdersDisplay = getElement('total-orders-display');
-    const orderHistoryContainer = getElement('order-history-container');
-    const profileUpdateForm = getElement('profile-update-form');
-    const profileNameInput = getElement('profile-name');
-    const profileEmailInput = getElement('profile-email');
-    const profilePhoneInput = getElement('profile-phone');
+    
+    const loadingContainer = getElement('loading-container');
+    const checkoutContainer = getElement('checkout-container');
+    const placeOrderForm = getElement('place-order-form');
+    const placeOrderBtn = getElement('place-order-btn');
+    const productSummaryDiv = getElement('product-summary');
+    const priceDetailsDiv = getElement('price-details');
+    const applyCouponBtn = getElement('apply-coupon-btn');
+    const couponStatusP = getElement('coupon-status');
+    const successScreen = getElement('success-screen');
+    const paymentOptions = getElement('payment-method-options');
+    const paymentConfirmationSection = getElement('payment-confirmation-section');
+    const paymentInstructions = getElement('payment-instructions');
+    const transactionIdInput = getElement('transactionId');
+    const senderNumberInput = getElement('senderNumber');
 
-    // --- Step 3: Authentication State Observer (The Entry Point) ---
+    // --- Step 3: Static Configuration and State Management ---
+    const paymentAccounts = {
+        bkash: "01700000000", // আপনার বিকাশ পার্সোনাল নম্বর দিন
+        nagad: "01800000000"  // আপনার নগদ পার্সোনাল নম্বর দিন
+    };
+    
+    const state = {
+        user: null,
+        product: null,
+        productId: null,
+        subtotal: 0,
+        discount: 0,
+        deliveryFee: 60,
+        total: 0,
+    };
+
+    // --- Step 4: Initialization - Check Auth and Load Data ---
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // User is logged in. Load the page data.
-            loadPageData(user);
+            state.user = user;
+            const params = new URLSearchParams(window.location.search);
+            state.productId = params.get('productId');
+            if (state.productId) {
+                loadCheckoutData();
+            } else {
+                showError("No product was selected. Please go back and choose a product.");
+            }
         } else {
-            // User is NOT logged in. Redirect to the login page immediately.
-            // This solves the "not redirecting" issue.
-            const redirectUrl = encodeURIComponent(window.location.pathname);
+            const redirectUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
             window.location.href = `/login?redirect=${redirectUrl}`;
         }
     });
 
-    /**
-     * Main function to load all data for the logged-in user.
-     * Uses a try...catch...finally block to guarantee the loading spinner is handled.
-     * @param {object} user - The Firebase user object.
-     */
-    async function loadPageData(user) {
+    async function loadCheckoutData() {
         try {
-            // Fetch user profile and orders in parallel for faster loading.
-            const [userData, orders] = await Promise.all([
-                fetchUserProfile(user.uid),
-                fetchUserOrders(user.uid)
-            ]);
+            const productRef = doc(db, 'products', state.productId);
+            const docSnap = await getDoc(productRef);
+            if (!docSnap.exists()) throw new Error("The selected product could not be found.");
 
-            // If we reach here, data fetching was successful.
-            // This solves the "data not showing" issue.
-            populateDashboard(userData, orders.length);
-            populateProfileForm(userData);
-            displayOrders(orders);
+            state.product = docSnap.data();
+            
+            // **BUG FIX**: Ensure subtotal is always a valid number, even if price/offerPrice is missing.
+            const price = Number(state.product.price) || 0;
+            const offerPrice = Number(state.product.offerPrice) || 0;
+            state.subtotal = offerPrice > 0 ? offerPrice : price;
+            
+            populateOrderSummary();
+            updatePriceDetails();
 
+            loadingContainer.classList.add('hidden');
+            checkoutContainer.classList.remove('hidden');
         } catch (error) {
-            // If any promise in Promise.all fails, this block catches the error.
-            console.error("CRITICAL ERROR loading account page data:", error);
-            accountDashboard.innerHTML = `<div class="bg-white p-6 rounded-lg shadow-md text-center"><h2 class="text-xl text-red-600 font-bold">Oops!</h2><p class="text-gray-700">Could not load your account details. Please check your connection and try again.</p></div>`;
-        
-        } finally {
-            // THIS IS THE KEY FIX: This block always runs, regardless of success or error.
-            // This solves the "loading spinner not disappearing" issue.
-            loadingSpinner.classList.add('hidden');
-            accountDashboard.classList.remove('hidden');
+            showError(error.message);
         }
     }
 
-    // --- Step 4: Data Fetching Functions ---
+    // --- Step 5: UI Update and Helper Functions ---
+    function populateOrderSummary() {
+        productSummaryDiv.innerHTML = `
+            <img src="${state.product.ogPic || 'https://via.placeholder.com/100'}" alt="${state.product.name}" class="w-16 h-16 rounded-md object-cover">
+            <div>
+                <h3 class="font-semibold">${state.product.name}</h3>
+                <p class="text-gray-600 text-sm">Price: ৳${state.subtotal.toFixed(2)}</p>
+            </div>`;
+    }
 
-    /** Fetches a user's profile from Firestore. */
-    async function fetchUserProfile(uid) {
-        const userRef = doc(db, 'users', uid);
-        const docSnap = await getDoc(userRef);
-        if (docSnap.exists()) {
-            return docSnap.data();
+    function updatePriceDetails() {
+        // **BUG FIX**: Sanitize all values before calculation to prevent NaN issues.
+        const subtotal = Number(state.subtotal) || 0;
+        const discount = Number(state.discount) || 0;
+        const deliveryFee = Number(state.deliveryFee) || 0;
+        state.total = subtotal - discount + deliveryFee;
+
+        priceDetailsDiv.innerHTML = `
+            <div class="flex justify-between"><span class="text-gray-600">Subtotal</span><span>৳${subtotal.toFixed(2)}</span></div>
+            <div class="flex justify-between text-green-600"><span>Discount</span><span>- ৳${discount.toFixed(2)}</span></div>
+            <div class="flex justify-between"><span class="text-gray-600">Delivery Fee</span><span>৳${deliveryFee.toFixed(2)}</span></div>
+            <div class="flex justify-between font-bold text-lg border-t pt-2 mt-2"><span>Total</span><span>৳${state.total.toFixed(2)}</span></div>`;
+    }
+
+    function showError(message) {
+        loadingContainer.classList.remove('flex');
+        loadingContainer.classList.add('block');
+        loadingContainer.innerHTML = `<p class="text-red-500 font-semibold p-4 bg-red-100 rounded-md">${message}</p>`;
+    }
+
+    function showSuccessScreen(orderId, orderDetails) {
+        checkoutContainer.classList.add('hidden');
+        const totalPaid = Number(orderDetails.priceDetails.total) || 0;
+        successScreen.innerHTML = `
+            <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+            <h2 class="text-3xl font-bold">Order Placed Successfully!</h2>
+            <p class="text-gray-600 mt-2">Your order is now pending confirmation. We will verify your payment and process it shortly.</p>
+            <div class="mt-6 text-left border-t pt-4 bg-gray-50 p-4 rounded-md">
+                <p><strong>Order ID:</strong> <span class="font-mono">${orderId}</span></p>
+                <p><strong>Total Amount:</strong> <span class="font-bold">৳${totalPaid.toFixed(2)}</span></p>
+            </div>
+            <a href="/account" class="mt-8 inline-block bg-indigo-600 text-white py-2 px-6 rounded hover:bg-indigo-700">View Order History</a>
+        `;
+        successScreen.classList.remove('hidden');
+    }
+
+    // --- Step 6: Event Handlers ---
+    applyCouponBtn.addEventListener('click', () => {
+        const couponCode = getElement('couponCode').value.toUpperCase();
+        if (couponCode === 'DISCOUNT10') {
+            state.discount = state.subtotal * 0.10;
+            couponStatusP.textContent = "Coupon 'DISCOUNT10' applied!";
+            couponStatusP.className = "text-sm mt-2 text-green-600";
         } else {
-            // This is a critical error and should be thrown to be caught by the main catch block.
-            throw new Error("User profile not found in the database. Please contact support.");
+            state.discount = 0;
+            couponStatusP.textContent = "Invalid coupon code.";
+            couponStatusP.className = "text-sm mt-2 text-red-500";
         }
-    }
+        updatePriceDetails();
+    });
 
-    /** Fetches a user's order history from Firestore. */
-    async function fetchUserOrders(uid) {
-        const ordersCol = collection(db, 'orders');
-        const q = query(ordersCol, where("userId", "==", uid), orderBy("orderDate", "desc"));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-    
-    // --- Step 5: UI Population and Event Handlers ---
-    
-// account.js
-
-    // account.js
-
-// ... (ফাইলের উপরের অংশ আগের মতোই থাকবে)
-
-function populateDashboard(userData, orderCount) {
-    userNameDisplay.textContent = userData.name || 'Valued Customer';
-    
-    // --- THIS IS THE FIX ---
-    // Check if walletBalance exists and is a number before calling toFixed().
-    // If not, default to '0.00'.
-    const balance = userData.walletBalance;
-    walletBalanceDisplay.textContent = `৳${(typeof balance === 'number') ? balance.toFixed(2) : '0.00'}`;
-    // ----------------------
-
-    totalOrdersDisplay.textContent = orderCount;
-}
-
-// ... (ফাইলের বাকি অংশ আগের মতোই থাকবে)
-
-    function populateProfileForm(userData) {
-        profileNameInput.value = userData.name || '';
-        profileEmailInput.value = userData.email || '';
-        profilePhoneInput.value = userData.phoneNumber || '';
-    }
-
-    function displayOrders(orders) {
-        if (orders.length === 0) {
-            orderHistoryContainer.innerHTML = '<p class="text-gray-500 text-center py-4">You haven\'t placed any orders yet.</p>';
-            return;
+    paymentOptions.addEventListener('change', (e) => {
+        const selectedMethod = e.target.value;
+        if (selectedMethod === 'bkash' || selectedMethod === 'nagad') {
+            const accountNumber = paymentAccounts[selectedMethod];
+            paymentInstructions.innerHTML = `
+                <p class="font-semibold">Please send <strong>৳${state.total.toFixed(2)}</strong> to this ${selectedMethod} personal number:</p>
+                <p class="text-2xl font-bold text-red-600 my-2">${accountNumber}</p>
+                <p>After sending money, enter the Transaction ID and your sender number below.</p>
+            `;
+            transactionIdInput.required = true;
+            senderNumberInput.required = true;
+            paymentConfirmationSection.classList.remove('hidden');
+        } else { // COD
+            paymentConfirmationSection.classList.add('hidden');
+            transactionIdInput.required = false;
+            senderNumberInput.required = false;
         }
-        const tableHTML = `
-            <table class="min-w-full bg-white">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    ${orders.map(order => `
-                        <tr>
-                            <td class="py-3 px-3">${order.productName}</td>
-                            <td class="py-3 px-3 font-semibold">৳${order.price.toFixed(2)}</td>
-                            <td class="py-3 px-3">
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full ${getStatusChipClass(order.status)}">
-                                    ${order.status}
-                                </span>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>`;
-        orderHistoryContainer.innerHTML = tableHTML;
-    }
+    });
 
-    profileUpdateForm.addEventListener('submit', async (e) => {
+    placeOrderForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const user = auth.currentUser;
-        if (!user) return;
+        placeOrderBtn.disabled = true;
+        placeOrderBtn.textContent = "Processing...";
 
-        const updatedData = {
-            name: profileNameInput.value,
-            phoneNumber: profilePhoneInput.value,
+        const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+        
+        const orderDetails = {
+            userId: state.user.uid, userEmail: state.user.email,
+            productId: state.productId, productName: state.product.name,
+            priceDetails: {
+                subtotal: state.subtotal, discount: state.discount,
+                deliveryFee: state.deliveryFee, total: state.total,
+            },
+            deliveryInfo: {
+                name: getElement('deliveryName').value, phone: getElement('deliveryPhone').value,
+                address: getElement('deliveryAddress').value, city: getElement('deliveryCity').value,
+            },
+            paymentMethod: selectedPaymentMethod, status: 'Pending',
+            orderDate: serverTimestamp()
         };
-
-        const userRef = doc(db, 'users', user.uid);
+        
+        if (selectedPaymentMethod !== 'cod') {
+            orderDetails.paymentDetails = {
+                transactionId: transactionIdInput.value, senderNumber: senderNumberInput.value,
+                accountNumber: paymentAccounts[selectedPaymentMethod], status: 'Unverified'
+            };
+        }
+        
         try {
-            await updateDoc(userRef, updatedData);
-            alert('Profile updated successfully!');
-            userNameDisplay.textContent = updatedData.name;
+            const ordersCollection = collection(db, 'orders');
+            const docRef = await addDoc(ordersCollection, orderDetails);
+            showSuccessScreen(docRef.id, orderDetails);
         } catch (error) {
-            alert('Error updating profile: ' + error.message);
+            console.error("Error placing order: ", error);
+            alert("Failed to place order. Please try again.");
+            placeOrderBtn.disabled = false;
+            placeOrderBtn.textContent = "Confirm Order";
         }
     });
-
-    logoutBtn.addEventListener('click', () => {
-        signOut(auth).then(() => {
-            window.location.href = '/';
-        }).catch(error => {
-            console.error('Logout Error:', error);
-        });
-    });
-
-    // Tab Switching Logic
-    const navButtons = document.querySelectorAll('.account-nav-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    navButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const targetId = button.dataset.target;
-            navButtons.forEach(btn => btn.classList.remove('active-nav-btn'));
-            button.classList.add('active-nav-btn');
-            tabContents.forEach(content => {
-                content.id === targetId ? content.classList.remove('hidden') : content.classList.add('hidden');
-            });
-        });
-    });
-
-    function getStatusChipClass(status) {
-        const statusClasses = {
-            'Pending': 'bg-yellow-100 text-yellow-800', 'Confirmed': 'bg-blue-100 text-blue-800',
-            'Shipped': 'bg-indigo-100 text-indigo-800', 'Delivered': 'bg-green-100 text-green-800',
-            'Cancelled': 'bg-red-100 text-red-800',
-        };
-        return statusClasses[status] || 'bg-gray-100 text-gray-800';
-    }
 });
