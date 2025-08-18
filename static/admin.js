@@ -1,5 +1,4 @@
-// --- Step 1: Import necessary functions and services ---
-// Import from your custom firebaseConfig.js file
+
 import { auth, db } from './firebaseConfig.js';
 
 // Import the specific auth function we need for this page
