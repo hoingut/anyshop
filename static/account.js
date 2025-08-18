@@ -17,7 +17,6 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 document.addEventListener('DOMContentLoaded', () => {
     // --- Step 2: DOM Element References ---
     const getElement = (id) => document.getElementById(id);
-
     const loadingSpinner = getElement('loading-spinner');
     const accountDashboard = getElement('account-dashboard');
     const logoutBtn = getElement('logout-btn');
