@@ -1,98 +1,4 @@
-// --- Step 1: Import necessary functions and services ---
-import { auth, db, doc, getDoc, addDoc, collection, serverTimestamp } from './firebaseConfig.js';
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Step 2: DOM Element References ---
-    const getElement = (id) => document.getElementById(id);
-    
-    const loadingContainer = getElement('loading-container');
-    const checkoutContainer = getElement('checkout-container');
-    const placeOrderForm = getElement('place-order-form');
-    const placeOrderBtn = getElement('place-order-btn');
-    const productSummaryDiv = getElement('product-summary');
-    const priceDetailsDiv = getElement('price-details');
-    const applyCouponBtn = getElement('apply-coupon-btn');
-    const couponStatusP = getElement('coupon-status');
-    const successScreen = getElement('success-screen');
-    const paymentOptions = getElement('payment-method-options');
-    const paymentConfirmationSection = getElement('payment-confirmation-section');
-    const paymentInstructions = getElement('payment-instructions');
-    const transactionIdInput = getElement('transactionId');
-    const senderNumberInput = getElement('senderNumber');
-
-    // --- Step 3: Static Configuration and State Management ---
-    const paymentAccounts = {
-        bkash: "01700000000", // আপনার বিকাশ পার্সোনাল নম্বর দিন
-        nagad: "01800000000"  // আপনার নগদ পার্সোনাল নম্বর দিন
-    };
-    
-    const state = {
-        user: null,
-        product: null,
-        productId: null,
-        subtotal: 0,
-        discount: 0,
-        deliveryFee: 60,
-        total: 0,
-    };
-
-    // --- Step 4: Initialization - Check Auth and Load Data ---
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            state.user = user;
-            const params = new URLSearchParams(window.location.search);
-            state.productId = params.get('productId');
-            if (state.productId) {
-                loadCheckoutData();
-            } else {
-                showError("No product was selected. Please go back and choose a product.");
-            }
-        } else {
-            const redirectUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-            window.location.href = `/login?redirect=${redirectUrl}`;
-        }
-    });
-
-    async function loadCheckoutData() {
-        try {
-            const productRef = doc(db, 'products', state.productId);
-            const docSnap = await getDoc(productRef);
-            if (!docSnap.exists()) throw new Error("The selected product could not be found.");
-
-            state.product = docSnap.data();
-            
-            // **BUG FIX**: Ensure subtotal is always a valid number, even if price/offerPrice is missing.
-            const price = Number(state.product.price) || 0;
-            const offerPrice = Number(state.product.offerPrice) || 0;
-            state.subtotal = offerPrice > 0 ? offerPrice : price;
-            
-            populateOrderSummary();
-            updatePriceDetails();
-
-            loadingContainer.classList.add('hidden');
-            checkoutContainer.classList.remove('hidden');
-        } catch (error) {
-            showError(error.message);
-        }
-    }
-
-    // --- Step 5: UI Update and Helper Functions ---
-    function populateOrderSummary() {
-        productSummaryDiv.innerHTML = `
-            <img src="${state.product.ogPic || 'https://via.placeholder.com/100'}" alt="${state.product.name}" class="w-16 h-16 rounded-md object-cover">
-            <div>
-                <h3 class="font-semibold">${state.product.name}</h3>
-                <p class="text-gray-600 text-sm">Price: ৳${state.subtotal.toFixed(2)}</p>
-            </div>`;
-    }
-
-    function updatePriceDetails() {
-        // **BUG FIX**: Sanitize all values before calculation to prevent NaN issues.
-        const subtotal = Number(state.subtotal) || 0;
-        const discount = Number(state.discount) || 0;
-        const deliveryFee = Number(state.deliveryFee) || 0;
-        state.total = subtotal - discount + deliveryFee;
+total - discount + deliveryFee;
 
         priceDetailsDiv.innerHTML = `
             <div class="flex justify-between"><span class="text-gray-600">Subtotal</span><span>৳${subtotal.toFixed(2)}</span></div>
@@ -198,3 +104,216 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+// --- Step 1: Import all necessary functions and services from Firebase ---
+import { auth, db, doc, getDoc, updateDoc, collection, query, where, orderBy, getDocs } from './firebaseConfig.js';
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+// --- Step 2: Main script execution block ---
+// This ensures the script runs only after the entire HTML document is fully loaded.
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM is ready. Initializing AnyShop account page script.");
+
+    // --- Step 3: Defensive DOM Element Selection ---
+    // This helper function safely gets elements and provides clear error messages if an ID is missing.
+    const getElement = (id, isCritical = true) => {
+        const element = document.getElementById(id);
+        if (!element && isCritical) {
+            // This is your best debugging tool! It will tell you EXACTLY which ID is missing from your HTML.
+            console.error(`FATAL ERROR: A critical HTML element with id "${id}" was not found.`);
+        } else if (!element) {
+            console.warn(`Warning: A non-critical HTML element with id "${id}" was not found.`);
+        }
+        return element;
+    };
+
+    // Get all necessary elements. Check your browser console for any "FATAL ERROR" messages after this.
+    const loadingSpinner = getElement('loading-spinner');
+    const accountDashboard = getElement('account-dashboard');
+    const logoutBtn = getElement('logout-btn');
+    const userNameDisplay = getElement('user-name-display');
+    const walletBalanceDisplay = getElement('wallet-balance-display');
+    const totalOrdersDisplay = getElement('total-orders-display');
+    const orderHistoryContainer = getElement('order-history-container');
+    const profileUpdateForm = getElement('profile-update-form');
+
+    // --- Step 4: Guard Clause ---
+    // If the most critical elements for the page to function are missing, stop the script.
+    if (!loadingSpinner || !accountDashboard) {
+        console.error("Script halted because essential page elements ('loading-spinner' or 'account-dashboard') are missing.");
+        return;
+    }
+
+    // --- Step 5: Authentication Observer (The Core Logic) ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            loadPageData(user);
+        } else {
+            const redirectUrl = encodeURIComponent(window.location.pathname);
+            window.location.href = `/login?redirect=${redirectUrl}`;
+        }
+    });
+
+    /**
+     * Main function to load all data for the logged-in user with robust error handling.
+     * @param {object} user - The Firebase user object.
+     */
+    async function loadPageData(user) {
+        try {
+            const [userData, orders] = await Promise.all([
+                fetchUserProfile(user.uid),
+                fetchUserOrders(user.uid)
+            ]);
+
+            populateDashboard(userData, orders.length);
+            populateProfileForm(userData);
+            displayOrders(orders);
+
+        } catch (error) {
+            console.error("CRITICAL ERROR while loading account page data:", error);
+            if (accountDashboard) {
+                accountDashboard.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                        <h2 class="text-xl text-red-600 font-bold">Oops! Something went wrong.</h2>
+                        <p class="text-gray-700 mt-2">Could not load your account details. Please try refreshing the page.</p>
+                        <p class="text-xs text-gray-500 mt-4">Error: ${error.message}</p>
+                    </div>`;
+            }
+        } finally {
+            // This block ALWAYS runs, ensuring the UI state is correct after loading.
+            if (loadingSpinner) loadingSpinner.style.display = 'none';
+            if (accountDashboard) accountDashboard.classList.remove('hidden');
+        }
+    }
+
+    // --- Data Fetching Functions ---
+    async function fetchUserProfile(uid) {
+        const userRef = doc(db, 'users', uid);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            return docSnap.data();
+        } else {
+            throw new Error("Your user profile was not found in our database. Please contact support.");
+        }
+    }
+
+    async function fetchUserOrders(uid) {
+        const q = query(collection(db, 'orders'), where("userId", "==", uid), orderBy("orderDate", "desc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+    
+    // --- UI Population Functions ---
+    function populateDashboard(userData, orderCount) {
+        if (userNameDisplay) userNameDisplay.textContent = userData.name || 'Valued Customer';
+        if (walletBalanceDisplay) {
+            const balance = userData.walletBalance;
+            walletBalanceDisplay.textContent = `৳${(typeof balance === 'number') ? balance.toFixed(2) : '0.00'}`;
+        }
+        if (totalOrdersDisplay) totalOrdersDisplay.textContent = orderCount;
+    }
+
+    function populateProfileForm(userData) {
+        const nameInput = getElement('profile-name', false);
+        const emailInput = getElement('profile-email', false);
+        const phoneInput = getElement('profile-phone', false);
+
+        if (nameInput) nameInput.value = userData.name || '';
+        if (emailInput) emailInput.value = userData.email || '';
+        if (phoneInput) phoneInput.value = userData.phoneNumber || '';
+    }
+
+    function displayOrders(orders) {
+        if (!orderHistoryContainer) return;
+        if (orders.length === 0) {
+            orderHistoryContainer.innerHTML = '<p class="text-gray-500 text-center py-4">You haven\'t placed any orders yet.</p>';
+            return;
+        }
+        
+        const tableHTML = `
+            <table class="min-w-full bg-white">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                        <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    ${orders.map(order => {
+                        const price = order.priceDetails?.total;
+                        const formattedPrice = (typeof price === 'number') ? price.toFixed(2) : 'N/A';
+                        
+                        return `
+                        <tr>
+                            <td class="py-3 px-3">${order.productName}</td>
+                            <td class="py-3 px-3 font-semibold">৳${formattedPrice}</td>
+                            <td class="py-3 px-3">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full ${getStatusChipClass(order.status)}">
+                                    ${order.status}
+                                </span>
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+        orderHistoryContainer.innerHTML = tableHTML;
+    }
+
+    // --- Event Listeners Setup ---
+    if (profileUpdateForm) {
+        profileUpdateForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const updatedData = {
+                name: getElement('profile-name').value,
+                phoneNumber: getElement('profile-phone').value,
+            };
+
+            const userRef = doc(db, 'users', user.uid);
+            try {
+                await updateDoc(userRef, updatedData);
+                alert('Profile updated successfully!');
+                if (userNameDisplay) userNameDisplay.textContent = updatedData.name;
+            } catch (error) {
+                alert('Error updating profile: ' + error.message);
+            }
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).catch(error => console.error('Logout Error:', error));
+        });
+    }
+
+    const navButtons = document.querySelectorAll('.account-nav-btn');
+    if (navButtons.length > 0) {
+        const tabContents = document.querySelectorAll('.tab-content');
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.dataset.target;
+                navButtons.forEach(btn => btn.classList.remove('active-nav-btn'));
+                button.classList.add('active-nav-btn');
+                tabContents.forEach(content => {
+                    if (content) {
+                       content.id === targetId ? content.classList.remove('hidden') : content.classList.add('hidden');
+                    }
+                });
+            });
+        });
+    }
+});
+
+// Helper function for order status styling
+function getStatusChipClass(status) {
+    const statusClasses = {
+        'Pending': 'bg-yellow-100 text-yellow-800',
+        'Confirmed': 'bg-blue-100 text-blue-800',
+        'Shipped': 'bg-indigo-100 text-indigo-800',
+        'Delivered': 'bg-green-100 text-green-800',
+        'Cancelled': 'bg-red-100 text-red-800',
+    };
+    return statusClasses[status] || 'bg-gray-100 text-gray-800';
+                }
