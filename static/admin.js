@@ -93,12 +93,18 @@ document.addEventListener('DOMContentLoaded', () => {
             category: getElement('category').value, metaTitle: getElement('metaTitle').value,
             keywords: getElement('keywords').value.split(',').map(k => k.trim()),
             metaDescription: getElement('metaDescription').value,
-            // static/admin.js (productData অবজেক্টে যোগ করুন)
-    // ... আগের সব ফিল্ড
-    advanceDeliveryRequired: document.getElementById('advanceDeliveryRequired').checked, // <-- নতুন লাইন
+            // static/admin.js (productData অবজেক্টে যোগ করুন
+            // admin.js -> addProductForm.addEventListener('submit', ...)
+    // নতুন ডেলিভারি ফিল্ড যোগ করুন
+    delivery: {
+        type: getElement('deliveryType').value, // 'regular' or 'prepaid'
+        specialDistrict: getElement('specialDistrict').value.trim().toLowerCase(), // e.g., 'dhaka'
+        feeSpecial: Number(getElement('feeSpecial').value) || 0,
+        feeRegular: Number(getElement('feeRegular').value) || 0
+    }
 };
-    
 
+        
         try {
             if (editingProductId) {
                 // Update existing product
@@ -212,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         editingProductId = id;
         formTitle.textContent = `Editing: ${product.name}`;
+
         
         // A safer way to populate the form
         getElement('productName').value = product.name || '';
@@ -226,7 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
         getElement('metaTitle').value = product.metaTitle || '';
         getElement('keywords').value = (product.keywords || []).join(', ');
         getElement('metaDescription').value = product.metaDescription || '';
-
+       // window.editProduct = (id) => { ... }
+if (product.delivery) {
+    getElement('deliveryType').value = product.delivery.type || 'regular';
+    getElement('specialDistrict').value = product.delivery.specialDistrict || '';
+    getElement('feeSpecial').value = product.delivery.feeSpecial || '';
+    getElement('feeRegular').value = product.delivery.feeRegular || '';
+    }
+ 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
