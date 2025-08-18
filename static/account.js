@@ -99,11 +99,26 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Step 5: UI Population and Event Handlers ---
     
-    function populateDashboard(userData, orderCount) {
-        userNameDisplay.textContent = userData.name || 'Valued Customer';
-        walletBalanceDisplay.textContent = `৳${userData.walletBalance?.toFixed(2) || '0.00'}`;
-        totalOrdersDisplay.textContent = orderCount;
-    }
+// account.js
+
+    // account.js
+
+// ... (ফাইলের উপরের অংশ আগের মতোই থাকবে)
+
+function populateDashboard(userData, orderCount) {
+    userNameDisplay.textContent = userData.name || 'Valued Customer';
+    
+    // --- THIS IS THE FIX ---
+    // Check if walletBalance exists and is a number before calling toFixed().
+    // If not, default to '0.00'.
+    const balance = userData.walletBalance;
+    walletBalanceDisplay.textContent = `৳${(typeof balance === 'number') ? balance.toFixed(2) : '0.00'}`;
+    // ----------------------
+
+    totalOrdersDisplay.textContent = orderCount;
+}
+
+// ... (ফাইলের বাকি অংশ আগের মতোই থাকবে)
 
     function populateProfileForm(userData) {
         profileNameInput.value = userData.name || '';
