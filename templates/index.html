@@ -54,12 +54,242 @@
             <p class="mt-4 text-lg opacity-90">Find the best products at unbeatable prices.</p>
         </header>
 
-        <!-- Image Slider -->
-        <div class="bg-gray-200 h-64 md:h-80 rounded-lg my-8 flex items-center justify-center text-gray-500 shadow-md">
-            <!-- Slider content can be dynamic. For now, a placeholder -->
-            <p class="text-2xl font-semibold">Dynamic Image Slider with Links</p>
-        </div>
 
+<style>
+    /* static/style.css (নতুন স্টাইল যোগ করুন) */
+
+/* =============== SLIDESHOW STYLES =============== */
+.slide-item {
+    transition: opacity 1s ease-in-out;
+}
+
+/* =============== ANIMATED REVIEW STYLES =============== */
+.review-ticker-wrapper {
+    width: 100%;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+
+#review-ticker {
+    animation: scroll-left 40s linear infinite;
+}
+
+.review-card {
+    flex-shrink: 0;
+    width: 320px;
+    background-color: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    text-align: left;
+}
+
+.review-stars {
+    color: #FBBF24; /* amber-400 */
+}
+
+@keyframes scroll-left {
+    from {
+        transform: translateX(0%);
+    }
+    to {
+        transform: translateX(-50%); /* Halfway, because the content is duplicated */
+    }
+}
+
+/* =============== ADVANCED FOOTER STYLES =============== */
+.footer-link {
+    position: relative;
+    transition: color 0.3s;
+}
+.footer-link::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 1px;
+    bottom: -2px;
+    left: 0;
+    background-color: #6366F1; /* indigo-500 */
+    transition: width 0.3s;
+}
+.footer-link:hover {
+    color: #a5b4fc; /* indigo-300 */
+}
+.footer-link:hover::after {
+    width: 100%;
+}
+
+.social-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #4B5563; /* gray-600 */
+    border-radius: 50%;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+.social-icon:hover {
+    background-color: #4F46E5; /* indigo-600 */
+    border-color: #4F46E5;
+                                        }
+</style>
+    <script>
+        // static/home.js (নতুন কোড যোগ করুন)
+
+
+// =============== 1. ADVANCED SLIDESHOW FUNCTION ===============
+function initializeSlideshow() {
+    // --- Slider Data (এটাকে আপনি Firebase থেকে আনতে পারেন) ---
+    const slides = [
+        {
+            img: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1999&auto=format&fit=crop',
+            link: '/products?category=Electronics',
+            alt: 'Electronics Sale'
+        },
+        {
+            img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=2070&auto=format&fit=crop',
+            link: '/products?category=Audio',
+            alt: 'Audio Gadgets'
+        },
+        {
+            img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=2070&auto=format&fit=crop',
+            link: '/products?category=Shoes',
+            alt: 'Fashionable Shoes'
+        }
+    ];
+
+    const sliderWrapper = document.getElementById('slider-wrapper');
+    const prevBtn = document.getElementById('prev-slide');
+    const nextBtn = document.getElementById('next-slide');
+    const indicatorsContainer = document.getElementById('slider-indicators');
+
+    if (!sliderWrapper || !prevBtn || !nextBtn || !indicatorsContainer) return;
+    
+    let currentIndex = 0;
+
+    // Create slides and indicators
+    sliderWrapper.innerHTML = slides.map(slide => `
+        <a href="${slide.link}" class="slide-item flex-shrink-0 w-full h-full">
+            <img src="${slide.img}" alt="${slide.alt}" class="w-full h-full object-cover">
+        </a>
+    `).join('');
+
+    indicatorsContainer.innerHTML = slides.map((_, index) => 
+        `<button class="indicator w-3 h-3 rounded-full bg-white/50 hover:bg-white" data-index="${index}"></button>`
+    ).join('');
+
+    const indicators = indicatorsContainer.querySelectorAll('.indicator');
+    
+    function updateSlider() {
+        sliderWrapper.style.transform = `translateX(-${currentIndex * 100}%)`;
+        indicators.forEach((indicator, index) => {
+            indicator.classList.toggle('bg-white', index === currentIndex);
+            indicator.classList.toggle('bg-white/50', index !== currentIndex);
+        });
+    }
+
+    function goToSlide(index) {
+        currentIndex = (index + slides.length) % slides.length;
+        updateSlider();
+    }
+    
+    nextBtn.addEventListener('click', () => goToSlide(currentIndex + 1));
+    prevBtn.addEventListener('click', () => goToSlide(currentIndex - 1));
+    
+    indicators.forEach(indicator => {
+        indicator.addEventListener('click', () => goToSlide(parseInt(indicator.dataset.index)));
+    });
+
+    // Auto-slide functionality
+    setInterval(() => goToSlide(currentIndex + 1), 5000); // Change slide every 5 seconds
+    
+    updateSlider(); // Initial update
+}
+
+
+// =============== 2. ANIMATED REVIEW TICKER FUNCTION ===============
+function initializeReviewTicker() {
+    // --- Review Data (এটাকে আপনি Firebase থেকে আনতে পারেন) ---
+    const reviews = [
+        { name: "Rahim Chowdhury", rating: 5, text: "Amazing product quality and fast delivery. Highly recommended!" },
+        { name: "Fatima Begum", rating: 4, text: "Good value for money. The customer service was also very helpful." },
+        { name: "Sajid Hasan", rating: 5, text: "I'm extremely satisfied with my purchase. Will definitely shop again." },
+        { name: "Nusrat Jahan", rating: 5, text: "The product exceeded my expectations. Top-notch quality!" },
+        { name: "Kamal Uddin", rating: 4, text: "The delivery was on time and the product was well-packaged. Good job!" },
+        { name: "Aisha Akter", rating: 5, text: "Flawless shopping experience from start to finish. Thank you, AnyShop!" },
+    ];
+    
+    const reviewTicker = document.getElementById('review-ticker');
+    if (!reviewTicker) return;
+
+    function createReviewCard(review) {
+        return `
+            <div class="review-card">
+                <div class="flex items-center mb-2">
+                    <div class="review-stars">${'<i class="fas fa-star"></i>'.repeat(review.rating)}</div>
+                    <span class="text-sm text-gray-400 ml-auto">${review.name}</span>
+                </div>
+                <p class="text-gray-700">${review.text}</p>
+            </div>
+        `;
+    }
+    
+    // Duplicate the reviews to create a seamless loop
+    const allReviewsHTML = [...reviews, ...reviews].map(createReviewCard).join('');
+    reviewTicker.innerHTML = allReviewsHTML;
+}
+
+
+// =============== 3. NEWSLETTER FORM FUNCTION ===============
+function initializeNewsletterForm() {
+    const newsletterForm = document.getElementById('newsletter-form');
+    if (!newsletterForm) return;
+    
+    newsletterForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const emailInput = document.getElementById('newsletter-email');
+        const email = emailInput.value;
+        
+        if (email && email.includes('@')) {
+            // Here you would typically send this email to your backend or a service like Mailchimp.
+            // For now, we'll just show an alert.
+            alert(`Thank you for subscribing with ${email}!`);
+            emailInput.value = '';
+        } else {
+            alert('Please enter a valid email address.');
+        }
+    });
+        }
+    </script>
+        
+
+<!-- =============== 1. ADVANCED SLIDESHOW SECTION =============== -->
+<section class="my-8 relative group" id="hero-slider-container">
+    <div class="overflow-hidden relative rounded-lg shadow-2xl h-56 sm:h-64 md:h-80 lg:h-96">
+        <!-- Slides will be injected here by JavaScript -->
+        <div id="slider-wrapper" class="h-full w-full flex transition-transform duration-500 ease-in-out">
+            <!-- Slide 1 (Example, will be replaced by JS) -->
+            <a href="#" class="slide-item flex-shrink-0 w-full h-full">
+                <img src="https://via.placeholder.com/1200x400/818cf8/ffffff?text=Loading+Slide+1" class="w-full h-full object-cover">
+            </a>
+        </div>
+    </div>
+    
+    <!-- Slider Controls -->
+    <button id="prev-slide" class="absolute top-1/2 left-4 transform -translate-y-1/2 bg-white/50 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    <button id="next-slide" class="absolute top-1/2 right-4 transform -translate-y-1/2 bg-white/50 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+    
+    <!-- Slider Indicators -->
+    <div id="slider-indicators" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+        <!-- Indicators will be injected here by JS -->
+    </div>
+                </section>
         <!-- Hot Products Section -->
         <section class="my-10">
             <h2 class="text-3xl font-bold mb-6 text-center">🔥 Hot Products</h2>
@@ -100,26 +330,79 @@
             </a>
         </section>
         
-        <!-- Reviews/Testimonials (Static for now) -->
-        <section class="my-10">
-            <h2 class="text-3xl font-bold mb-6 text-center">What Our Customers Say</h2>
-            <!-- Review cards go here -->
-        </section>
 
-    </main>
+<!-- ... (আপনার হট প্রোডাক্টস, নিউ প্রোডাক্টস ইত্যাদি সেকশন আগের মতোই থাকবে) ... -->
 
-    <!-- Footer -->
-    <footer class="bg-gray-800 text-white py-8 mt-10">
-        <div class="container mx-auto text-center">
-            <p>&copy; {{ current_year }} AnyShop. All rights reserved.</p>
-            <div class="mt-4 space-x-4">
-                <a href="#" class="hover:text-indigo-400">About Us</a>
-                <a href="#" class="hover:text-indigo-400">Contact</a>
-                <a href="#" class="hover:text-indigo-400">Privacy Policy</a>
+
+<!-- =============== 2. ANIMATED REVIEW SECTION =============== -->
+<section class="py-16 bg-gray-50 my-10 overflow-hidden">
+    <div class="container mx-auto text-center px-4">
+        <h2 class="text-3xl font-bold mb-2">Loved by Our Customers</h2>
+        <p class="text-gray-600 mb-12">Here's what they are saying about us.</p>
+        
+        <!-- Scrolling Review Ticker -->
+        <div class="review-ticker-wrapper">
+            <div id="review-ticker" class="flex space-x-8">
+                <!-- Reviews will be duplicated and injected here by JS -->
             </div>
         </div>
-    </footer>
+    </div>
+</section>
 
+
+<!-- =============== 3. ADVANCED FOOTER SECTION =============== -->
+<footer class="bg-gray-800 text-gray-300 pt-16 pb-8">
+    <div class="container mx-auto px-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <!-- Column 1: About AnyShop -->
+            <div>
+                <h3 class="text-lg font-semibold text-white mb-4">AnyShop</h3>
+                <p class="text-sm">Your one-stop destination for quality products. We aim to provide the best shopping experience from the comfort of your home.</p>
+                <div class="flex space-x-4 mt-4">
+                    <a href="#" class="social-icon hover:text-white"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="social-icon hover:text-white"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="social-icon hover:text-white"><i class="fab fa-youtube"></i></a>
+                </div>
+            </div>
+            
+            <!-- Column 2: Quick Links -->
+            <div>
+                <h3 class="text-lg font-semibold text-white mb-4">Quick Links</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="/products" class="footer-link">All Products</a></li>
+                    <li><a href="/account" class="footer-link">My Account</a></li>
+                    <li><a href="#" class="footer-link">Track Order</a></li>
+                    <li><a href="#" class="footer-link">About Us</a></li>
+                </ul>
+            </div>
+
+            <!-- Column 3: Customer Service -->
+            <div>
+                <h3 class="text-lg font-semibold text-white mb-4">Customer Service</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="#" class="footer-link">FAQ</a></li>
+                    <li><a href="#" class="footer-link">Contact Us</a></li>
+                    <li><a href="#" class="footer-link">Return Policy</a></li>
+                    <li><a href="#" class="footer-link">Privacy Policy</a></li>
+                </ul>
+            </div>
+
+            <!-- Column 4: Newsletter Subscription -->
+            <div>
+                <h3 class="text-lg font-semibold text-white mb-4">Subscribe to our Newsletter</h3>
+                <p class="text-sm mb-4">Get the latest updates on new products and upcoming sales.</p>
+                <form id="newsletter-form" class="flex">
+                    <input type="email" id="newsletter-email" placeholder="Your email address" class="w-full bg-gray-700 text-white px-4 py-2 rounded-l-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700">Go</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-12 border-t border-gray-700 pt-6 text-center text-sm">
+            <p>&copy; {{ current_year }} AnyShopBD. All Rights Reserved. Developed with ❤️.</p>
+        </div>
+    </div>
+    </footer>
     <!-- Widgets -->
     <div id="support-widget" class="fixed bottom-5 left-5 bg-blue-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer">
         <i class="fas fa-question text-2xl"></i>
