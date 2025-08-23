@@ -50,6 +50,24 @@ def not_found_error(error):
     response = make_response(render_template('404.html'), 404)
     return response
 
+# app.py
+
+# ... (আপনার অন্যান্য রুটগুলো আগের মতোই থাকবে) ...
+
+@app.route('/admin/orders')
+def admin_orders():
+    return render_template('admin-orders.html', title="Order Management")
+
+@app.route('/admin/users')
+def admin_users():
+    """
+    Renders the dedicated user management page (admin-users.html).
+    এই নতুন রুটটি ইউজার ম্যানেজমেন্ট পেজ দেখানোর জন্য।
+    """
+    return render_template('admin-users.html', title="User Management")
+
+# ... (বাকি কোড আগের মতোই থাকবে) ...
+
 @app.errorhandler(500)
 def internal_error(error):
     response = make_response(render_template('500.html'), 500)
